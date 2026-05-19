@@ -317,13 +317,13 @@
         // BLOQUE 0: REEMPLAZA ESTO CON TUS DATOS DE FIREBASE
         // ==========================================
         const firebaseConfig = {
-            apiKey: "AIzaSyDN3v7ts7tdqT3w3kHUr98xETVoF7EkPZQ",
-            authDomain: "auditoria-flash-realtime",
-            databaseURL: "https://auditoria-flash-realtime-default-rtdb.firebaseio.com",
-            projectId: "auditoria-flash-realtime",
-            storageBucket: "auditoria-flash-realtime.firebasestorage.app",
-            messagingSenderId: "15034197371",
-            appId: "1:15034197371:web:1a7db84e559ee4ebb509de"
+            apiKey: "TU_API_KEY_AQUI",
+            authDomain: "TU_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT_ID.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
         };
         
         firebase.initializeApp(firebaseConfig);
@@ -333,6 +333,27 @@
         let dbTeoricaFiltrada = {}; 
         let registrosEscaneadosEnVivo = []; 
         let idBodegaSeleccionado = "";
+
+        // Lista de agencias fijas de contingencia para el celular cuando no hay CSV
+        const agenciasPredeterminadas = {
+            "6537": "REPELON",
+            "SAB": "SABANALARGA", // Puedes agregar aquí los IDs reales que usas seguido de su nombre
+            "BAQ": "BARRANQUILLA"
+        };
+
+        // Al cargar la página, llenamos el select con las agencias base por si se abre en celular
+        window.onload = function() {
+            const select = document.getElementById('selectAgencia');
+            // Si el select está vacío o solo tiene la opción inicial, metemos las fijas
+            if(select.options.length <= 1) {
+                for (let id in agenciasPredeterminadas) {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.innerText = `ID: ${id} [${agenciasPredeterminadas[id]}]`;
+                    select.appendChild(opt);
+                }
+            }
+        };
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function emitirSonido(tipo) {
@@ -419,7 +440,6 @@
                     select.appendChild(opt);
                 });
 
-                select.disabled = false;
                 mostrarMensajeCaja("Estructura Indexada", "✓ Archivo cargado correctamente por llaves de Bodega.", "#ecfdf5", "#10b981", "#065f46");
             };
 
@@ -436,6 +456,7 @@
                 return;
             }
 
+            // Mapeamos el teórico local si existe un CSV cargado (modo PC administrador)
             baseCompletaCSV.forEach(item => {
                 if (item.idBodega === idBodegaSeleccionado) {
                     dbTeoricaFiltrada[item.guia] = {
@@ -448,8 +469,7 @@
                 }
             });
 
-            // ESCUCHA EN TIEMPO REAL DESDE FIREBASE
-            // Cada vez que se lee una guía en esta bodega, se actualiza la app de inmediato
+            // ESCUCHA EN TIEMPO REAL DESDE FIREBASE (Funciona en PC y Celular por igual)
             database.ref('auditorias/' + idBodegaSeleccionado).on('value', function(snapshot) {
                 const data = snapshot.val() || {};
                 registrosEscaneadosEnVivo = [];
@@ -459,7 +479,6 @@
                     dbTeoricaFiltrada[g].escaneada = false;
                 }
 
-                // Procesar registros guardados en Firebase (orden inverso para ver los últimos arriba)
                 let llaves = Object.keys(data);
                 llaves.reverse().forEach(key => {
                     let record = data[key];
@@ -507,7 +526,6 @@
                 this.value = ""; 
                 if (!codigo || !idBodegaSeleccionado) return;
 
-                // Verificar si ya fue escaneada en el lote actual en Firebase
                 let yaEscaneada = registrosEscaneadosEnVivo.some(r => r.guia === codigo);
 
                 if (dbTeoricaFiltrada.hasOwnProperty(codigo)) {
@@ -529,7 +547,6 @@
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         };
 
-                        // SUBIR A FIREBASE REALTIME
                         database.ref('auditorias/' + idBodegaSeleccionado).push(nuevoRegistro);
 
                         if (evaluacion.claseFila === "row-alerta-rojo") {
@@ -560,7 +577,6 @@
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         };
 
-                        // SUBIR A FIREBASE REALTIME
                         database.ref('auditorias/' + idBodegaSeleccionado).push(nuevoSobrante);
 
                         mostrarMensajeCaja(`❌ ALERTA SOBRANTE (Guía: ${codigo})`, "ESTE PAQUETE NO PERTENECE A ESTA RUTA. SEPARAR INMEDIATAMENTE.", "#fef2f2", "#dc2626", "#b91c1c");
@@ -627,9 +643,18 @@
                 });
             }
 
-            document.getElementById('cntTeorico').innerText = totalTeorico;
-            document.getElementById('cntConciliadas').innerText = conciliadas;
-            document.getElementById('cntPendientes').innerText = pendientes;
+            // Si hay un archivo cargado (Computador), mostramos los pendientes calculados matemáticamente
+            if(totalTeorico > 0) {
+                document.getElementById('cntTeorico').innerText = totalTeorico;
+                document.getElementById('cntConciliadas').innerText = conciliadas;
+                document.getElementById('cntPendientes').innerText = pendientes;
+            } else {
+                // Modo espejo (Celular): Muestra el conteo de lo que va cayendo en la base de datos
+                let totalConciliadosRealtime = registrosEscaneadosEnVivo.filter(r => r.tipo === 'conciliado').length;
+                document.getElementById('cntTeorico').innerText = "-";
+                document.getElementById('cntConciliadas').innerText = totalConciliadosRealtime;
+                document.getElementById('cntPendientes').innerText = "-";
+            }
             document.getElementById('cntSobrantes').innerText = sobrantes;
         }
     </script>
