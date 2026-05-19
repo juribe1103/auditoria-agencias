@@ -253,8 +253,8 @@
             
             <div class="filter-wrapper">
                 <label style="font-size: 12px; font-weight: bold; color: #475569;">SELECCIONAR ID BODEGA DE LA AGENCIA:</label>
-                <select id="selectAgencia" onchange="aplicarFiltroAgencia()" disabled>
-                    <option value="">-- Cargue un archivo para mapear IDs --</option>
+                <select id="selectAgencia" onchange="aplicarFiltroAgencia()">
+                    <option value="">-- Selecciona ID Bodega --</option>
                 </select>
             </div>
         </div>
@@ -337,14 +337,13 @@
         // Lista de agencias fijas de contingencia para el celular cuando no hay CSV
         const agenciasPredeterminadas = {
             "6537": "REPELON",
-            "SAB": "SABANALARGA", // Puedes agregar aquí los IDs reales que usas seguido de su nombre
+            "SAB": "SABANALARGA", 
             "BAQ": "BARRANQUILLA"
         };
 
         // Al cargar la página, llenamos el select con las agencias base por si se abre en celular
         window.onload = function() {
             const select = document.getElementById('selectAgencia');
-            // Si el select está vacío o solo tiene la opción inicial, metemos las fijas
             if(select.options.length <= 1) {
                 for (let id in agenciasPredeterminadas) {
                     const opt = document.createElement('option');
@@ -431,6 +430,7 @@
                 }
 
                 const select = document.getElementById('selectAgencia');
+                select.disabled = false; // MODIFICACIÓN: Nos aseguramos de forzar el desbloqueo al leer el CSV
                 select.innerHTML = '<option value="">-- Selecciona ID Bodega --</option>';
                 
                 Array.from(bodegasUnicas.keys()).sort((a,b) => a - b).forEach(id => {
@@ -456,7 +456,6 @@
                 return;
             }
 
-            // Mapeamos el teórico local si existe un CSV cargado (modo PC administrador)
             baseCompletaCSV.forEach(item => {
                 if (item.idBodega === idBodegaSeleccionado) {
                     dbTeoricaFiltrada[item.guia] = {
@@ -469,12 +468,10 @@
                 }
             });
 
-            // ESCUCHA EN TIEMPO REAL DESDE FIREBASE (Funciona en PC y Celular por igual)
             database.ref('auditorias/' + idBodegaSeleccionado).on('value', function(snapshot) {
                 const data = snapshot.val() || {};
                 registrosEscaneadosEnVivo = [];
 
-                // Resetear estado teórico local basándonos en Firebase
                 for (let g in dbTeoricaFiltrada) {
                     dbTeoricaFiltrada[g].escaneada = false;
                 }
@@ -643,13 +640,11 @@
                 });
             }
 
-            // Si hay un archivo cargado (Computador), mostramos los pendientes calculados matemáticamente
             if(totalTeorico > 0) {
                 document.getElementById('cntTeorico').innerText = totalTeorico;
                 document.getElementById('cntConciliadas').innerText = conciliadas;
                 document.getElementById('cntPendientes').innerText = pendientes;
             } else {
-                // Modo espejo (Celular): Muestra el conteo de lo que va cayendo en la base de datos
                 let totalConciliadosRealtime = registrosEscaneadosEnVivo.filter(r => r.tipo === 'conciliado').length;
                 document.getElementById('cntTeorico').innerText = "-";
                 document.getElementById('cntConciliadas').innerText = totalConciliadosRealtime;
